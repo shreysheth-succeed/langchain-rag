@@ -7,7 +7,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 
-chat_model = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
+# chat_model = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
 
 
 # Define a prompt template for generating a refined prompt
