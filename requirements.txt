@@ -1,0 +1,12 @@
+langchain
+langgraph
+sentence-transformers
+chromadb
+pymupdf
+pdfplumber
+pandas
+tiktoken
+pyodbc
+fastapi
+uvicorn
+python-dotenv
