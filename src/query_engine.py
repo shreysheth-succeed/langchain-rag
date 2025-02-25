@@ -7,6 +7,9 @@ from langchain_anthropic import ChatAnthropic
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 
+os.environ["ANTHROPIC_API_KEY"] = "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"
+chat_model = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
+
 
 # Define a prompt template for generating a refined prompt
 prompt_generator_template = PromptTemplate(
