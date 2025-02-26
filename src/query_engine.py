@@ -1,29 +1,57 @@
 import os
+from dotenv import load_dotenv
 from argparse import ArgumentParser
-from langchain_community.vectorstores import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.prompts import PromptTemplate
-from langchain_anthropic import ChatAnthropic
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from langchain_core.output_parsers import StrOutputParser
+from langchain_chroma import Chroma
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+# from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.prompts import ChatPromptTemplate
 
-os.environ["ANTHROPIC_API_KEY"] = "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"
-chat_model = ChatAnthropic(model="claude-3-sonnet-20240229", temperature=0)
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+CHROMA_PATH = "vector_store/Sensors"
 
 
-# Define a prompt template for generating a refined prompt
-prompt_generator_template = PromptTemplate(
-    input_variables=["question", "context"],
-    template="Given the context: {context}, generate a well-structured prompt for an AI to answer the question: {question}"
-)
 
-# Define a prompt template for answering the generated prompt
-answer_template = PromptTemplate(
-    input_variables=["generated_prompt"],
-    template="You are an AI assistant. Please provide a detailed response to the following prompt: {generated_prompt}"
-)
+PROMPT_TEMPLATE = """
+Answer the question based only on the following context. If answer not found within the context, tell user that "I am sorry, I can't help with that :("
 
-# Create a sequential chain
-full_chain = ({"question": RunnablePassthrough(), "context": RunnableLambda(lambda _: "The water level in Himalaya has risen by 5000 meters above sea level")} | prompt_generator_template | chat_model | answer_template | chat_model | StrOutputParser())
-response = full_chain.invoke("what is the weather in ahmedabad today?")
-print(response)
+Context:
+{context}
+
+---
+
+Question: {question}
+"""
+
+def main():
+    # Create CLI.
+    parser = ArgumentParser()
+    parser.add_argument("query_text", type=str, help="The query text.")
+    args = parser.parse_args()
+    query_text = args.query_text
+
+    # Prepare the DB.
+    # embedding_function = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    embedding_function = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
+    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function, collection_metadata={"hnsw:space": "cosine"})
+
+    # Search the DB.
+    results = db.similarity_search_with_relevance_scores(query_text, k=3)
+    normalized_results = [(doc, (1 + score) / 2) for doc, score in results]
+    # filtered_results = [doc for doc in normalized_results if doc[1] >= 0.7]
+
+    context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in normalized_results])
+    prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+    prompt = prompt_template.format(context=context_text, question=query_text)
+    # print(prompt)
+
+    model = ChatOpenAI(api_key=OPENAI_API_KEY)
+    response_text = model.invoke(prompt)
+
+    sources = [doc.metadata.get("source", None) for doc, _score in normalized_results]
+    formatted_response = f"Response:\n{response_text.content}\n\nSources: {sources}"
+    print(formatted_response)
+
+
+if __name__ == "__main__":
+    main()
